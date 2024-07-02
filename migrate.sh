@@ -24,11 +24,13 @@ function github_check_repository() {
   http_status=$(echo "$fetch_repository" | jq -r 'if .message == "Not Found" then "404" elif .message == "Bad credentials" then "401" else "200" end')
 
   # GitHub repo metadata
-  REPOSITORY_NAME=$(echo "$fetch_repository" | jq -r '.name')
-  REPOSITORY_FULL_NAME=$(echo "$fetch_repository" | jq -r '.full_name')
-  REPOSITORY_DESCRIPTION=$(echo "$fetch_repository" | jq -r '.description')
-  REPOSITORY_OPEN_PR=$(echo "$fetch_repository" | jq -r '.open_issues')
-  REPOSITORY_TOPICS=$(echo "$fetch_repository" | jq -r '.topics[]' | paste -sd ',')
+  if [ "$http_status" -eq 200 ]; then
+    REPOSITORY_NAME=$(echo "$fetch_repository" | jq -r '.name')
+    REPOSITORY_FULL_NAME=$(echo "$fetch_repository" | jq -r '.full_name')
+    REPOSITORY_DESCRIPTION=$(echo "$fetch_repository" | jq -r '.description')
+    REPOSITORY_OPEN_PR=$(echo "$fetch_repository" | jq -r '.open_issues')
+    REPOSITORY_TOPICS=$(echo "$fetch_repository" | jq -r '.topics[]' | paste -sd ',')
+  fi
 }
 
 function github_check_branch() {
@@ -60,10 +62,12 @@ function github_create_repository() {
   repo_name="$1"
   repo_description="$2"
   repo_topics="$3"
-  repo_branches="$4"
 
   IFS=',' read -r -a _tp <<< "$repo_topics"
-  IFS=',' read -r -a _br <<< "$repo_branches"
+
+  if [ "${repo_description}" == "null" ]; then
+    repo_description="Repository migrated with $OUTPUT_BRANCH_TYPE."
+  fi
   
   echo "Creating repository ..."
   sleep 1
@@ -79,27 +83,22 @@ function github_create_repository() {
        }" \
     -o /dev/null
 
-  format_topics=$(echo "$repo_topics" | jq -R 'split(",") | {names: .}')
+  if [ -z "${repo_topics:-}" ]; then
+    echo "No topics to add."
+  else
+    echo "Add topics ..."
+    sleep 1
+    format_topics=$(echo "$repo_topics" | jq -R 'split(",") | {names: .}')
 
-  echo "Add topics ..."
-  sleep 1
-  curl -sL \
-    -X PUT \
-    -H "Accept: application/vnd.github+json" \
-    -H "Authorization: token ${GITHUB_AUTH_TOKEN}" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    "${GITHUB_API_URL}/repos/${GITHUB_OWNER}/${repo_name}/topics" \
-    -d "$format_topics" \
-    -o /dev/null
-
-  for b in "${_br[@]}"
-  do
-    if [ "main" == "$b" ] && [ "git flow" == "$OUTPUT_BRANCH_TYPE" ]; then
-      echo "Add branches ..."
-    else
-      continue
-    fi
-  done
+    curl -sL \
+        -X PUT \
+        -H "Accept: application/vnd.github+json" \
+        -H "Authorization: token ${GITHUB_AUTH_TOKEN}" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "${GITHUB_API_URL}/repos/${GITHUB_OWNER}/${repo_name}/topics" \
+        -d "$format_topics" \
+        -o /dev/null
+  fi
 }
 
 function github_convert_branch_type() {
@@ -124,7 +123,7 @@ function github_convert_branch_type() {
     echo "--------------------------"
     printf "\n"
 
-    github_create_repository "$NEW_REPOSITORY" "$REPOSITORY_DESCRIPTION" "$REPOSITORY_TOPICS" "$BRANCH_PATTERN"
+    github_create_repository "$NEW_REPOSITORY" "$REPOSITORY_DESCRIPTION" "$REPOSITORY_TOPICS"
 
     echo "Mirroring repository ..."
     sleep 1
@@ -137,6 +136,39 @@ function github_convert_branch_type() {
   fi
 }
 
+function github_add_branches() {
+  repo_branches="$1"
+
+  IFS=',' read -r -a _br <<< "$repo_branches"
+
+  for b in "${_br[@]}"; do
+    if [ "main" == "$b" ] && [ "git flow" == "$OUTPUT_BRANCH_TYPE" ]; then
+      BRANCH_SHA=$(curl -sL \
+        -H "Accept: application/vnd.github+json" \
+        -H "Authorization: token ${GITHUB_AUTH_TOKEN}" \
+        -H "X-GitHub-Api-Version: 2022-11-28" \
+        "${GITHUB_API_URL}/repos/${GITHUB_OWNER}/${NEW_REPOSITORY}/git/ref/heads/main" | \
+        jq -r '.object.sha')
+      
+      echo "Add branches from ref: $BRANCH_SHA"
+
+      for add in "${_br[@]:1}"; do
+        curl -sL \
+            -X POST \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: token ${GITHUB_AUTH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "${GITHUB_API_URL}/repos/${GITHUB_OWNER}/${NEW_REPOSITORY}/git/refs" \
+            -d "{\"ref\": \"refs/heads/${add}\", \"sha\":\"${BRANCH_SHA}\"}" \
+            -o /dev/null
+      done
+    else
+      continue
+    fi
+  done
+
+}
+
 github_check_repository
 
 function main() {
@@ -147,6 +179,7 @@ function main() {
       #printf "Migrating braching strategy type ...\n\n"
       github_check_branch
       github_convert_branch_type
+      github_add_branches "$BRANCH_PATTERN"
       exit 0
       ;;
     401)
