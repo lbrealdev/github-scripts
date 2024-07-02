@@ -136,7 +136,7 @@ function github_convert_branch_type() {
   fi
 }
 
-function github_add_branches() {
+function github_branches() {
   repo_branches="$1"
 
   IFS=',' read -r -a _br <<< "$repo_branches"
@@ -162,8 +162,22 @@ function github_add_branches() {
             -d "{\"ref\": \"refs/heads/${add}\", \"sha\":\"${BRANCH_SHA}\"}" \
             -o /dev/null
       done
-    else
-      continue
+
+    elif [ "main" == "$b" ] && [ "github flow" == "$OUTPUT_BRANCH_TYPE" ]; then      
+      branches_to_remove=(develop staging)
+      
+      echo "Remove branches ..."
+      sleep 1
+
+      for refs in "${branches_to_remove[@]}"; do
+        curl -sL \
+            -X DELETE \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: token ${GITHUB_AUTH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "${GITHUB_API_URL}/repos/${GITHUB_OWNER}/${NEW_REPOSITORY}/git/refs/heads/${refs}"
+      done
+
     fi
   done
 
@@ -179,7 +193,7 @@ function main() {
       #printf "Migrating braching strategy type ...\n\n"
       github_check_branch
       github_convert_branch_type
-      github_add_branches "$BRANCH_PATTERN"
+      github_branches "$BRANCH_PATTERN"
       exit 0
       ;;
     401)
