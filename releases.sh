@@ -32,8 +32,8 @@ function fetch_repository() {
     REPOSITORY_PR_COUNT=$(echo "$fetch_repository" | jq -r '.open_issues_count')
     REPOSITORY_TOPICS=$(echo "$fetch_repository" | jq -r '.topics[]' | paste -sd ',')
     REPOSITORY_TEMPLATE=$(echo "$fetch_repository" | jq -r '.is_template')
+    REPOSITORY_VISIBILITY=$(echo "$fetch_repository" | jq -r '.visibility')
     REPOSITORY_API_URL=$(echo "$fetch_repository" | jq -r '.url')
-    REPOSITORY_CLONE_URL=$(echo "$fetch_repository" | jq -r '.clone_url')
   fi
 }
 
@@ -140,9 +140,9 @@ function display() {
   printf "Repository description: %s\n" "$REPOSITORY_DESCRIPTION"
   printf "Repository open PR: %s\n" "$REPOSITORY_PR_COUNT"
   printf "Repository template: %s\n" "${REPOSITORY_TEMPLATE^}"
+  printf "Repository visibility: %s\n" "${REPOSITORY_VISIBILITY^}"
   printf "Repository clone URL: %s\n" "${REPOSITORY_API_URL/api.github.com\/repos/github.com}.git"
   echo "--------------------------"
-  printf "\n"
   #printf "%s\n" "$FETCH_JSON"
 }
 
