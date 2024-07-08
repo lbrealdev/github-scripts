@@ -69,6 +69,12 @@ function environments() {
     environments=$(echo "$fetch" | jq -r '.environments[].name' | sort)
     total_count=$(echo "$fetch" | jq -r '.total_count')
     has_environments=true
+
+    # Test if environments is a empty string.
+    if [ -z "$environments" ]; then
+      echo "No environments found!"
+      return 0
+    fi
     
     if [ "$total_count" -eq 3 ]; then
       environment_type="git-flow"
@@ -304,6 +310,6 @@ variables "$REPOSITORY_API_URL"
 teams "$REPOSITORY_API_URL"
 
 # Create, mirror and archive repository.
-create_repository "$REPOSITORY_API_URL" "$REPOSITORY_NAME" "$REPOSITORY_DESCRIPTION" "$REPOSITORY_TOPICS" "$REPOSITORY_ORG"
-mirror "$REPOSITORY_API_URL"
-archive "$REPOSITORY_FULL_NAME"
+#create_repository "$REPOSITORY_API_URL" "$REPOSITORY_NAME" "$REPOSITORY_DESCRIPTION" "$REPOSITORY_TOPICS" "$REPOSITORY_ORG"
+#mirror "$REPOSITORY_API_URL"
+#archive "$REPOSITORY_FULL_NAME"
