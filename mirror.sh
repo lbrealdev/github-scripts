@@ -202,6 +202,10 @@ function teams() {
   fi
 }
 
+# Repository variables
+# This function get all variables at repository level
+# and find by RUNNER_VARS variables
+# RUNNER_GROUP and RUNNER_LABELS.
 function variables() {
   variables_url="${1/%/\/actions\/variables}"
 
@@ -233,6 +237,9 @@ function variables() {
   fi
 }
 
+# Create repository
+# This functions will create the target repository
+# using the metadata outputs.
 function create_repository() {
   dest_repo_url="${1/%/--migrate}"
   dest_repo_name="${2/%/--migrate}"
@@ -265,7 +272,6 @@ function create_repository() {
 
   echo "Add topics ..."
   sleep 1
-
   curl -sL \
     -X PUT \
     -H "Accept: application/vnd.github+json" \
@@ -276,6 +282,10 @@ function create_repository() {
     -o /dev/null
 }
 
+# Mirroring repository
+# This function will mirror the source repository
+# to target repository.
+# https://docs.github.com/en/repositories/creating-and-managing-repositories/duplicating-a-repository
 function mirror() {
   clone_url="${1/api.github.com\/repos/github.com}.git"
   mirror_url="${1/api.github.com\/repos/github.com}--migrate.git"
@@ -283,12 +293,12 @@ function mirror() {
   echo "Mirroring repository ..."
   sleep 1
 
-  mkdir bare-repo && cd bare-repo || exit
+  mkdir source-repo && cd source-repo || exit
   git clone --bare -q "$clone_url"
   cd "${REPOSITORY_NAME}.git" || exit
   git push --mirror -q "$mirror_url"
   cd ../..
-  rm -rf bare-repo/
+  rm -rf source-repo/
 }
 
 function display() {
@@ -307,10 +317,10 @@ function display() {
     printf "Repository clone URL: %s\n" "${REPOSITORY_API_URL/api.github.com\/repos/github.com}.git"
     echo "--------------------------"
     #printf "%s\n" "$FETCH_JSON"
-    echo
     #echo -e "./create-repository.sh \n --name '$REPOSITORY_NAME-migrate' \n --description '$REPOSITORY_DESCRIPTION' \n --team '$PRODUCT_TEAM_SLUG' \n --code-type 'NA' \n --topics '$REPOSITORY_TOPICS' \n --runner-group '$RUNNER_GROUP' \n --runner-labels '$RUNNER_LABELS'"
   else
     echo "No metadata fetched!"
+    exit 1
   fi
 }
 
@@ -323,7 +333,7 @@ display
 #tags "$REPOSITORY_API_URL"
 #secrets "$REPOSITORY_API_URL"
 #environments "$REPOSITORY_API_URL"
-#teams "$REPOSITORY_API_URL"
-#variables "$REPOSITORY_API_URL"
+teams "$REPOSITORY_API_URL"
+variables "$REPOSITORY_API_URL"
 #create_repository "$REPOSITORY_API_URL" "$REPOSITORY_NAME" "$REPOSITORY_DESCRIPTION" "$REPOSITORY_TOPICS"
 #mirror "$REPOSITORY_API_URL"
