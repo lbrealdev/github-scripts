@@ -129,29 +129,6 @@ function tags() {
   fi
 }
 
-function secrets() {
-  secrets_url="${1/%/\/actions\/secrets}"
-
-  fetch=$(curl -sL \
-    -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${GITHUB_AUTH_TOKEN}" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    "$secrets_url")
-
-  is_empty=$(echo "$fetch" | jq -r 'if .total_count == 0 then "true" else "false" end')
-
-  echo -e "\nFetching secrets ..."
-  sleep 1
-  if [ "$is_empty" == "true" ]; then
-    echo "No secrets found!"
-  else
-    SECRETS=$(echo "$fetch" | jq -r '.secrets[].name')
-    SECRETS_COUNT=$(echo "$fetch" | jq -r '.total_count')
-    printf "%s secrets found.\n%s\n" "$SECRETS_COUNT" "$SECRETS"
-    return 0
-  fi
-}
-
 # Repository environments
 # This function will get all
 # deployment environments from a repository.
@@ -185,6 +162,32 @@ function environments() {
     fi
 
     echo "$environments"
+  fi
+}
+
+# Repository secrets
+# This function will get all
+# secrets from a repository.
+function secrets() {
+  secrets_url="${1/%/\/actions\/secrets}"
+
+  fetch=$(curl -sL \
+    -H "Accept: application/vnd.github+json" \
+    -H "Authorization: Bearer ${GITHUB_AUTH_TOKEN}" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    "$secrets_url")
+
+  is_empty=$(echo "$fetch" | jq -r 'if .secrets == [] then "true" else "false" end')
+
+  echo -e "\nFetching secrets ..."
+  echo
+  sleep 1
+  if [ "$is_empty" == "true" ]; then
+    echo "No secrets found!"
+  else
+    secrets=$(echo "$fetch" | jq -r '.secrets[] | "\(.name)=sensitive-value"')
+    total_count=$(echo "$fetch" | jq -r '.total_count')
+    echo "$secrets"
   fi
 }
 
@@ -356,12 +359,14 @@ function display() {
 fetch_repository
 display
 
+environments "$REPOSITORY_API_URL"
+secrets "$REPOSITORY_API_URL"
 
 #deployments "$REPOSITORY_API_URL"
 #releases "$REPOSITORY_API_URL"
 #tags "$REPOSITORY_API_URL"
-#secrets "$REPOSITORY_API_URL"
-environments "$REPOSITORY_API_URL"
+
+
 #teams "$REPOSITORY_API_URL"
 #variables "$REPOSITORY_API_URL"
 #create_repository "$REPOSITORY_API_URL" "$REPOSITORY_NAME" "$REPOSITORY_DESCRIPTION" "$REPOSITORY_TOPICS"
