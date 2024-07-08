@@ -279,7 +279,13 @@ function archive() {
 # This function will display
 # all variables obtained from the fetch_repository function.
 function display() {
-  if [ "$HTTP_STATUS" -eq 200 ]; then
+  if [ "$HTTP_STATUS" -eq 401 ]; then
+    echo "Unauthorized access. Please check your GitHub PAT token."
+    exit 1
+  elif [ "$HTTP_STATUS" -eq 404 ]; then
+    echo "Repository not found!"
+    exit 1
+  else
     echo
     echo "--------------------------"
     printf "SOURCE REPOSITORY METADATA\n"
@@ -294,9 +300,6 @@ function display() {
     echo "--------------------------"
     #printf "%s\n" "$FETCH_JSON"
     #echo -e "./create-repository.sh \n --name '$REPOSITORY_NAME-migrate' \n --description '$REPOSITORY_DESCRIPTION' \n --team '$PRODUCT_TEAM_SLUG' \n --code-type 'NA' \n --topics '$REPOSITORY_TOPICS' \n --runner-group '$RUNNER_GROUP' \n --runner-labels '$RUNNER_LABELS'"
-  else
-    echo "No metadata fetched!"
-    exit 1
   fi
 }
 
