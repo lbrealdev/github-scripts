@@ -40,92 +40,7 @@ function fetch_repository() {
     REPOSITORY_TEMPLATE=$(echo "$fetch_repository" | jq -r '.is_template')
     REPOSITORY_VISIBILITY=$(echo "$fetch_repository" | jq -r '.visibility')
     REPOSITORY_API_URL=$(echo "$fetch_repository" | jq -r '.url')
-  fi
-}
-
-function deployments() {
-  deployments_url="${1/%/\/deployments}"
-
-  fetch=$(curl -sL \
-    -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${GITHUB_AUTH_TOKEN}" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    "$deployments_url")
-
-  is_empty=$(echo "$fetch" | jq -r 'if . == [] then "true" else "false" end')
-  #count
-
-  DEPLOYMENT_CREATOR=$(echo "$fetch" | jq -r 'if .[].creator == null then "automatic" else .[].creator.login end')
-
-  echo "Fetching deployments ..."
-  echo
-  sleep 1
-  if [ "$is_empty" == "true" ]; then
-    echo "No deployments found!"
-  else
-    DEPLOYMENT_REF=$(echo "$fetch" | jq -r '.[].ref')
-    DEPLOYMENT_ID=$(echo "$fetch" | jq -r '.[].id')
-    TASK=$(echo "$fetch" | jq -r '.[].task')
-    #echo "$TASK"
-    echo "$DEPLOYMENT_ID" | wc -l
-  fi
-
-  #echo "$DEPLOYMENT_CREATOR"
-}
-
-function releases() {
-  releases_url="${1/%/\/releases}"
-
-  fetch=$(curl -sL \
-    -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${GITHUB_AUTH_TOKEN}" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    "$releases_url")
-
-  is_empty=$(echo "$fetch" | jq -r 'if . == [] then "true" else "false" end')
-
-  echo -e "\nFetching releases ..."
-  echo
-  sleep 1
-  if [ "$is_empty" == "true" ]; then
-    echo "No releases found!"
-  else
-    RELEASES=$(echo "$fetch" | jq -r '.[].tag_name' | sort | paste -sd ',')
-
-    IFS=',' read -r -a _r <<< "$RELEASES"
-
-    for release in "${_r[@]}"; do
-      echo "Release: $release"
-      sleep 1
-    done
-  fi
-}
-
-function tags() {
-  tags_url="${1/%/\/tags}"
-
-  fetch=$(curl -sL \
-    -H "Accept: application/vnd.github+json" \
-    -H "Authorization: Bearer ${GITHUB_AUTH_TOKEN}" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    "$tags_url")
-
-  is_empty=$(echo "$fetch" | jq -r 'if . == [] then "true" else "false" end')
-
-  echo -e "\nFetching tags ..."
-  echo
-  sleep 1
-  if [ "$is_empty" == "true" ]; then
-    echo "No tags found!"
-  else
-    TAGS=$(echo "$fetch" | jq -r '.[].name' | sort | paste -sd ',')
-
-    IFS=',' read -r -a _tags <<< "$TAGS"
-
-    for tag in "${_tags[@]}"; do
-      echo "Tag: $tag"
-      sleep 1
-    done
+    REPOSITORY_ORG=$(echo "$fetch_repository" | jq -r 'if .organization then "true" else "false" end')
   fi
 }
 
@@ -160,7 +75,6 @@ function environments() {
     else
       environment_type="github-flow"
     fi
-
     echo "$environments"
   fi
 }
@@ -191,6 +105,9 @@ function secrets() {
   fi
 }
 
+# Repository teams
+# This function will get all teams
+# from the repository.
 function teams() {
   teams_url="${1/%/\/teams}"
 
@@ -257,8 +174,8 @@ function variables() {
     RUNNER_VARS=$(echo "$fetch" | jq -r '.variables[] | select(.name == "RUNNER_GROUP" or .name == "RUNNER_LABELS") | "\(.name)=\(.value)"')
     if [ -n "$RUNNER_VARS" ]; then
       echo "Runner variables are defined."
-      RUNNER_GROUP=$(echo "$RUNNER_VARS" | awk 'NR==1' | cut -d "=" -f2)
-      RUNNER_LABELS=$(echo "$RUNNER_VARS" | awk 'NR==2' | cut -d "=" -f2 | cut -d'"' -f2)
+      RUNNER_GROUP=$(echo "$RUNNER_VARS" | awk 'NR==1' | cut -d'=' -f2)
+      RUNNER_LABELS=$(echo "$RUNNER_VARS" | awk 'NR==2' | cut -d'=' -f2 | cut -d'"' -f2)
     else
       echo "Runner variables are not defined."
     fi
@@ -274,6 +191,7 @@ function create_repository() {
   dest_repo_name="${2/%/--migrate}"
   dest_repo_description="$3"
   dest_repo_topics="$4"
+  is_org="$5"
 
   if [ "$dest_repo_description" == "null" ]; then
     dest_repo_description="Repository migrate testing!"
@@ -283,13 +201,19 @@ function create_repository() {
     dest_repo_topics="migrate"
   fi
 
-  echo "Creating repository ..."
+  if [ "$is_org" == "true" ]; then
+    url="${GITHUB_API_URL}/orgs/${GITHUB_OWNER}/repos"
+  else
+    url="${GITHUB_API_URL}/user/repos"
+  fi
+
+  echo -e "\nCreating repository ..."
   sleep 1
   curl -sL \
     -H "Accept: application/vnd.github+json" \
     -H "Authorization: token ${GITHUB_AUTH_TOKEN}" \
     -H "X-GitHub-Api-Version: 2022-11-28" \
-    "${GITHUB_API_URL}/user/repos" \
+    "$url" \
     -d "{
          \"name\": \"${dest_repo_name}\",
          \"description\": \"${dest_repo_description}\",
@@ -330,13 +254,25 @@ function mirror() {
   rm -rf source-repo/
 }
 
+# Archive source repository
+# This function use `gh` to archive source repository.
+function archive() {
+  repo_full_name="$1"
+  
+  if ! hash gh 2> /dev/null; then
+    echo "error: you do not have 'gh' installed which is required for this script."
+    exit 1
+  fi
+  
+  echo "Archiving source repository ..."
+  gh repo archive "$repo_full_name" -y > /dev/null 2>&1
+}
+
 # Repository metadata
 # This function will display
 # all variables obtained from the fetch_repository function.
 function display() {
   if [ "$HTTP_STATUS" -eq 200 ]; then
-    # Display repository metadata
-    # from fetch_repository function.
     echo
     echo "--------------------------"
     printf "SOURCE REPOSITORY METADATA\n"
@@ -347,6 +283,7 @@ function display() {
     printf "Repository visibility: %s\n" "${REPOSITORY_VISIBILITY^}"
     printf "Repository topics: %s\n" "${REPOSITORY_TOPICS}"
     printf "Repository clone URL: %s\n" "${REPOSITORY_API_URL/api.github.com\/repos/github.com}.git"
+    printf "Repository organization: %s\n" "${REPOSITORY_ORG^}"
     echo "--------------------------"
     #printf "%s\n" "$FETCH_JSON"
     #echo -e "./create-repository.sh \n --name '$REPOSITORY_NAME-migrate' \n --description '$REPOSITORY_DESCRIPTION' \n --team '$PRODUCT_TEAM_SLUG' \n --code-type 'NA' \n --topics '$REPOSITORY_TOPICS' \n --runner-group '$RUNNER_GROUP' \n --runner-labels '$RUNNER_LABELS'"
@@ -356,18 +293,17 @@ function display() {
   fi
 }
 
+# Fetch metadata.
 fetch_repository
 display
 
+# Fetch GitHub objects.
 environments "$REPOSITORY_API_URL"
 secrets "$REPOSITORY_API_URL"
+variables "$REPOSITORY_API_URL"
+teams "$REPOSITORY_API_URL"
 
-#deployments "$REPOSITORY_API_URL"
-#releases "$REPOSITORY_API_URL"
-#tags "$REPOSITORY_API_URL"
-
-
-#teams "$REPOSITORY_API_URL"
-#variables "$REPOSITORY_API_URL"
-#create_repository "$REPOSITORY_API_URL" "$REPOSITORY_NAME" "$REPOSITORY_DESCRIPTION" "$REPOSITORY_TOPICS"
-#mirror "$REPOSITORY_API_URL"
+# Create, mirror and archive repository.
+create_repository "$REPOSITORY_API_URL" "$REPOSITORY_NAME" "$REPOSITORY_DESCRIPTION" "$REPOSITORY_TOPICS" "$REPOSITORY_ORG"
+mirror "$REPOSITORY_API_URL"
+archive "$REPOSITORY_FULL_NAME"
