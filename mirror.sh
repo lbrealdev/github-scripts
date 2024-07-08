@@ -10,8 +10,8 @@ fi
 
 GITHUB_URL="https://github.com"
 GITHUB_API_URL=${GITHUB_URL/https:\/\//https:\/\/api.}
-GITHUB_OWNER="$(echo "$1" | cut -d / -f 1)"
-GITHUB_REPO="$(echo "$1" | cut -d / -f 2)"
+GITHUB_OWNER="$(echo "$1" | cut -d'/' -f 1)"
+GITHUB_REPO="$(echo "$1" | cut -d'/' -f 2)"
 
 function fetch_repository() {
 
@@ -152,6 +152,9 @@ function secrets() {
   fi
 }
 
+# Repository environments
+# This function will get all
+# deployment environments from a repository.
 function environments() {
   environments_url="${1/%/\/environments}"
 
@@ -160,6 +163,29 @@ function environments() {
     -H "Authorization: Bearer ${GITHUB_AUTH_TOKEN}" \
     -H "X-GitHub-Api-Version: 2022-11-28" \
     "$environments_url")
+
+  is_empty=$(echo "$fetch" | jq -r 'if (. == [] or (.message? == "Not Found")) then "true" else "false" end // "false"')
+  has_environments=false
+
+  echo -e "\nFetch environments ..."
+  sleep 1
+  echo
+  if [ "$is_empty" == "true" ]; then
+    echo "No environments found!"
+    has_environments=false
+  else
+    environments=$(echo "$fetch" | jq -r '.environments[].name' | sort)
+    total_count=$(echo "$fetch" | jq -r '.total_count')
+    has_environments=true
+    
+    if [ "$total_count" -eq 3 ]; then
+      environment_type="git-flow"
+    else
+      environment_type="github-flow"
+    fi
+
+    echo "$environments"
+  fi
 }
 
 function teams() {
@@ -301,6 +327,9 @@ function mirror() {
   rm -rf source-repo/
 }
 
+# Repository metadata
+# This function will display
+# all variables obtained from the fetch_repository function.
 function display() {
   if [ "$HTTP_STATUS" -eq 200 ]; then
     # Display repository metadata
@@ -332,8 +361,8 @@ display
 #releases "$REPOSITORY_API_URL"
 #tags "$REPOSITORY_API_URL"
 #secrets "$REPOSITORY_API_URL"
-#environments "$REPOSITORY_API_URL"
-teams "$REPOSITORY_API_URL"
-variables "$REPOSITORY_API_URL"
+environments "$REPOSITORY_API_URL"
+#teams "$REPOSITORY_API_URL"
+#variables "$REPOSITORY_API_URL"
 #create_repository "$REPOSITORY_API_URL" "$REPOSITORY_NAME" "$REPOSITORY_DESCRIPTION" "$REPOSITORY_TOPICS"
 #mirror "$REPOSITORY_API_URL"
