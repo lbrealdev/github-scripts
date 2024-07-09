@@ -41,6 +41,7 @@ function fetch_repository() {
     REPOSITORY_VISIBILITY=$(echo "$fetch_repository" | jq -r '.visibility')
     REPOSITORY_API_URL=$(echo "$fetch_repository" | jq -r '.url')
     REPOSITORY_ORG=$(echo "$fetch_repository" | jq -r 'if .organization then "true" else "false" end')
+    REPOSITORY_ARCHIVED=$(echo "$fetch_repository" | jq -r '.archived')
   fi
 }
 
@@ -216,7 +217,8 @@ function create_repository() {
 
   echo -e "\nCreating repository ..."
   sleep 1
-  curl -sL \
+  
+  create_dest_repo=$(curl -sL \
     -H "Accept: application/vnd.github+json" \
     -H "Authorization: token ${GITHUB_AUTH_TOKEN}" \
     -H "X-GitHub-Api-Version: 2022-11-28" \
@@ -225,8 +227,16 @@ function create_repository() {
          \"name\": \"${dest_repo_name}\",
          \"description\": \"${dest_repo_description}\",
          \"auto_init\": \"true\"
-       }" \
-    -o /dev/null
+       }" | \
+    jq -r 'if .status == "422" then .message else "created" end')
+
+  if [ "$create_dest_repo" != "created" ]; then
+    echo "$create_dest_repo"
+    echo "The source repository already has a mirrored migration repository!"
+    exit 1
+  else
+    :;
+  fi
 
   format_topics=$(echo "$dest_repo_topics" | jq -R 'split(",") | {names: .}')
 
@@ -265,14 +275,20 @@ function mirror() {
 # This function use `gh` to archive source repository.
 function archive() {
   repo_full_name="$1"
+  is_archived="$2"
   
   if ! hash gh 2> /dev/null; then
     echo "error: you do not have 'gh' installed which is required for this script."
     exit 1
   fi
   
-  echo "Archiving source repository ..."
-  gh repo archive "$repo_full_name" -y > /dev/null 2>&1
+  if [ "$is_archived" == "false" ]; then
+    echo "Archiving source repository ..."
+    gh repo archive "$repo_full_name" -y > /dev/null 2>&1
+  else
+    echo "Source repository is already archived!"
+    exit 0
+  fi
 }
 
 # Repository metadata
@@ -297,6 +313,7 @@ function display() {
     printf "Repository topics: %s\n" "${REPOSITORY_TOPICS}"
     printf "Repository clone URL: %s\n" "${REPOSITORY_API_URL/api.github.com\/repos/github.com}.git"
     printf "Repository organization: %s\n" "${REPOSITORY_ORG^}"
+    printf "Repository archived: %s\n" "${REPOSITORY_ARCHIVED^}"
     echo "--------------------------"
     #printf "%s\n" "$FETCH_JSON"
   fi
@@ -320,6 +337,6 @@ teams "$REPOSITORY_API_URL"
 display_script
 
 # Create, mirror and archive repository.
-#create_repository "$REPOSITORY_API_URL" "$REPOSITORY_NAME" "$REPOSITORY_DESCRIPTION" "$REPOSITORY_TOPICS" "$REPOSITORY_ORG"
-#mirror "$REPOSITORY_API_URL"
-#archive "$REPOSITORY_FULL_NAME"
+create_repository "$REPOSITORY_API_URL" "$REPOSITORY_NAME" "$REPOSITORY_DESCRIPTION" "$REPOSITORY_TOPICS" "$REPOSITORY_ORG"
+mirror "$REPOSITORY_API_URL" 
+archive "$REPOSITORY_FULL_NAME" "$REPOSITORY_ARCHIVED"
