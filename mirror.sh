@@ -299,8 +299,11 @@ function display() {
     printf "Repository organization: %s\n" "${REPOSITORY_ORG^}"
     echo "--------------------------"
     #printf "%s\n" "$FETCH_JSON"
-    #echo -e "./create-repository.sh \n --name '$REPOSITORY_NAME-migrate' \n --description '$REPOSITORY_DESCRIPTION' \n --team '$PRODUCT_TEAM_SLUG' \n --code-type 'NA' \n --topics '$REPOSITORY_TOPICS' \n --runner-group '$RUNNER_GROUP' \n --runner-labels '$RUNNER_LABELS'"
   fi
+}
+
+function display_script() {
+  echo -e "\n./create-repository.sh \n --name '$REPOSITORY_NAME-migrate' \n --description '$REPOSITORY_DESCRIPTION' \n --team '$PRODUCT_TEAM_SLUG' \n --code-type 'NA' \n --topics '$REPOSITORY_TOPICS' \n --runner-group '$RUNNER_GROUP' \n --runner-labels '$RUNNER_LABELS'"
 }
 
 # Fetch metadata.
@@ -312,6 +315,9 @@ environments "$REPOSITORY_API_URL"
 secrets "$REPOSITORY_API_URL"
 variables "$REPOSITORY_API_URL"
 teams "$REPOSITORY_API_URL"
+
+# Run script
+display_script
 
 # Create, mirror and archive repository.
 #create_repository "$REPOSITORY_API_URL" "$REPOSITORY_NAME" "$REPOSITORY_DESCRIPTION" "$REPOSITORY_TOPICS" "$REPOSITORY_ORG"
