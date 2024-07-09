@@ -231,8 +231,9 @@ function create_repository() {
     jq -r 'if .status == "422" then .message else "created" end')
 
   if [ "$create_dest_repo" != "created" ]; then
-    echo "$create_dest_repo"
-    echo "The source repository already has a mirrored migration repository!"
+    printf "\nThe source repository already has a mirrored migration repository!\n"
+    echo "Source repo: ${REPOSITORY_API_URL/api.github.com\/repos/github.com}.git"
+    echo "Target repo: ${REPOSITORY_API_URL/api.github.com\/repos/github.com}--migrate.git"
     exit 1
   else
     :;
