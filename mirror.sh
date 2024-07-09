@@ -303,7 +303,7 @@ function display() {
 }
 
 function display_script() {
-  echo -e "\n./create-repository.sh \n --name '$REPOSITORY_NAME-migrate' \n --description '$REPOSITORY_DESCRIPTION' \n --team '$PRODUCT_TEAM_SLUG' \n --code-type 'NA' \n --topics '$REPOSITORY_TOPICS' \n --runner-group '$RUNNER_GROUP' \n --runner-labels '$RUNNER_LABELS'"
+  echo -e "\n./create-repository.sh \n --name '$REPOSITORY_NAME--migrate' \n --description '$REPOSITORY_DESCRIPTION' \n --team '$PRODUCT_TEAM_SLUG' \n --code-type 'NA' \n --topics '$REPOSITORY_TOPICS' \n --runner-group '$RUNNER_GROUP' \n --runner-labels '$RUNNER_LABELS'"
 }
 
 # Fetch metadata.
