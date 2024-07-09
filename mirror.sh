@@ -182,8 +182,8 @@ function variables() {
     RUNNER_LABEL_FILTER=$(echo "$fetch" | jq -r '.variables[] | select(.name == "RUNNER_LABELS") | "\(.name)=\(.value)"')
     if [ -n "$RUNNER_GROUP_FILTER" ] && [ -n "$RUNNER_LABEL_FILTER" ]; then
       echo "Runner variables are defined."
-      RUNNER_GROUP=$(echo "$RUNNER_GROUP_FILTER" | awk 'NR==1' | cut -d'=' -f2)
-      RUNNER_LABELS=$(echo "$RUNNER_LABEL_FILTER" | awk 'NR==2' | cut -d'=' -f2 | cut -d'"' -f2)
+      RUNNER_GROUP=$(echo "$RUNNER_GROUP_FILTER" | cut -d'=' -f2)
+      RUNNER_LABELS=$(echo "$RUNNER_LABEL_FILTER" | cut -d'=' -f2 | cut -d'"' -f2)
     else
       echo "Runner variables are not defined."
     fi
